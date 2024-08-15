@@ -1,6 +1,5 @@
-'use client'
-import { NextResponse } from "next/server";
-import OpenAI from "openai";
+import { NextResponse } from 'next/server';
+import OpenAI from 'openai';
 
 export const systemPrompt = `You are a customer support representative for Headstarter AI, a platform specializing in conducting AI-driven interviews for software engineering (SWE) jobs. Your goal is to provide accurate, friendly, and efficient support to users, ensuring a seamless experience with the platform.
 
@@ -31,44 +30,39 @@ Continuous Improvement:
 Collect user feedback to identify common issues and suggest improvements to the platform.
 Stay updated on platform changes, new features, and AI enhancements to provide the most current information.`
 
-export async function POST(req){
-    const openai = new OpenAI({apiKey: process.env.OPENAI_API_KEY});
+export async function POST(req) {
+
+    const openai = new OpenAI({
+        apiKey: process.env.OPENAI_API_KEY,
+    })
     const data = await req.json();
-    try {
+
     const completion = await openai.chat.completions.create({
         messages: [
-            {
-            role: 'system',
-            content: systemPrompt
-            },
-            ...data.messages,
-        ],
+            { role: "system", content: systemPrompt }, ...data],
         model: "gpt-3.5-turbo",
-        stream: true, 
+        stream: true,
     })
 
+    // Create a ReadableStream to handle the streaming response
     const stream = new ReadableStream({
-        async start(controller){
-            const encoder = new TextDecoder()
-            try{
-                for await (const chunk of completion){
-                    const content = chunk.choices[0]?.delta?.content
-                    if(content){
-                        const text = encoder.encode(content)
-                        controller.enqueue(text)
+        async start(controller) {
+            const encoder = new TextEncoder() // Create a TextEncoder to convert strings to Uint8Array
+            try {
+                // Iterate over the streamed chunks of the response
+                for await (const chunk of completion) {
+                    const content = chunk.choices[0]?.delta?.content // Extract the content from the chunk
+                    if (content) {
+                        const text = encoder.encode(content) // Encode the content to Uint8Array
+                        controller.enqueue(text) // Enqueue the encoded text to the stream
                     }
                 }
-            } catch (err){
-                controller.error(err);
+            } catch (err) {
+                controller.error(err) // Handle any errors that occur during streaming
             } finally {
-                controller.close();
+                controller.close() // Close the stream when done
             }
         },
     })
-
-    return new NextResponse(stream)
-} catch(err) {
-    console.error('Error in POST Handler', err)
-    return new NextResponse('Internal Server Error:', {status: 500})
-}
+    return new NextResponse(stream) // Return the stream as the response
 }
